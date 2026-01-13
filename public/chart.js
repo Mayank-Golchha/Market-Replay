@@ -299,23 +299,59 @@ function refreshChart(shouldFit = false) {
 
 function parseOHLCV(csvText) {
     const lines = csvText.trim().split('\n');
+    if (lines.length < 2) return [];
+
+    // Normalize headers
+    const headers = lines[0].split(',').map(h => h.trim().toLowerCase());
+
+    const idx = {
+        date: headers.indexOf('date'),
+        time: headers.indexOf('time'),
+        open: headers.indexOf('open'),
+        high: headers.indexOf('high'),
+        low: headers.indexOf('low'),
+        close: headers.indexOf('close'),
+    };
+
+    // Validate required columns
+    if ([idx.date, idx.time, idx.open, idx.high, idx.low, idx.close].some(i => i === -1)) {
+        console.error('CSV header mismatch');
+        return [];
+    }
+
     const result = [];
+
     for (let i = 1; i < lines.length; i++) {
         const cols = lines[i].split(',');
-        if (cols.length < 7) continue;
-        const d = cols[1].split('-'); 
-        const t = cols[2].split(':');
-        const timestamp = Date.UTC(d[2], d[1]-1, d[0], t[0], t[1], t[2] || 0) / 1000;
+        if (cols.length < headers.length) continue;
+
+        const d = cols[idx.date].split('-');     // DD-MM-YYYY
+        const t = cols[idx.time].split(':');     // HH:MM:SS
+
+        const timestamp = Date.UTC(
+            +d[2],
+            +d[1] - 1,
+            +d[0],
+            +t[0],
+            +t[1],
+            +t[2] || 0
+        ) / 1000;
+
         if (!isNaN(timestamp)) {
             result.push({
                 time: timestamp,
-                open: parseFloat(cols[3]), high: parseFloat(cols[4]),
-                low: parseFloat(cols[5]), close: parseFloat(cols[6])
+                open: +cols[idx.open],
+                high: +cols[idx.high],
+                low: +cols[idx.low],
+                close: +cols[idx.close],
             });
         }
     }
+
     return result.sort((a, b) => a.time - b.time);
 }
+
+
 
 uploadInput.addEventListener('change', (e) => {
     const file = e.target.files[0];
@@ -334,4 +370,5 @@ setSeriesType('candles');
 window.addEventListener('resize', () => {
     chart.applyOptions({ width: chartContainer.clientWidth });
     resizeChart();
+
 });
